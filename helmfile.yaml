@@ -1,0 +1,178 @@
+---
+repositories:
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami
+  - name: autoscaler
+    url: https://kubernetes.github.io/autoscaler
+  - name: aws-eks
+    url: https://aws.github.io/eks-charts
+  - name: nginx
+    url: https://helm.nginx.com/stable
+  - name: datadog
+    url: https://helm.datadoghq.com
+
+commonLabels:
+  subsplash.io/env: demo
+  subsplash.io/installer: helmfile
+
+releases:
+  - name: node-termination-handler
+    namespace: kube-system
+    chart: aws-eks/aws-node-termination-handler
+    version: ">=0.13 <1.0"
+    values:
+      - fullnameOverride: node-termination-handler
+      - image:
+          pullPolicy: Always
+      - securityContext:
+          runAsUserID: 10001
+          runAsGroupID: 10001
+      - resources:
+          requests:
+            memory: 64Mi
+            cpu: 50m
+          limits:
+            memory: 128Mi
+            cpu: 100m
+      - logLevel: error
+
+  - name: cluster-autoscaler
+    namespace: kube-system
+    chart: autoscaler/cluster-autoscaler
+    version: ">=9.0 <10.0"
+    values:
+      - fullnameOverride: cluster-autoscaler
+      - autoDiscovery:
+          clusterName: demo
+      - awsRegion: us-west-2
+      - image:
+          pullPolicy: Always
+      - resources:
+          limits:
+            cpu: 100m
+            memory: 300Mi
+          requests:
+            cpu: 100m
+            memory: 300Mi
+      - ServiceMonitor:
+          enabled: true
+      - extraArgs:
+          v: 2
+          skip-nodes-with-system-pods: false
+          skip-nodes-with-local-storage: false
+
+  - name: external-dns
+    namespace: kube-system
+    chart: bitnami/external-dns
+    version: ">=4.0 <5.0"
+    values:
+      - image:
+          pullPolicy: Always
+      - region: us-west-2
+      - logLevel: warning
+      - resources:
+          limits:
+            cpu: 50m
+            memory: 50Mi
+          requests:
+            memory: 50Mi
+            cpu: 10m
+      - metrics:
+          enabled: true
+      - serviceMonitor:
+          enabled: true
+
+  - name: metrics-server
+    namespace: kube-system
+    chart: bitnami/metrics-server
+    version: ">=5.0 <6.0"
+    values:
+      - apiService:
+          create: true
+      - image:
+          pullPolicy: Always
+      - resources:
+          limits:
+            cpu: 250m
+            memory: 256Mi
+          requests:
+            cpu: 250m
+            memory: 256Mi
+
+  - name: internal
+    namespace: kube-system
+    chart: nginx/nginx-ingress
+    version: ">=0.8 <1.0"
+    values:
+      - healthStatus: true
+      - controller:
+          ingressClass: internal
+      - prometheus:
+          create: true
+      - image:
+          pullPolicy: Always
+      - resources:
+          limits:
+            cpu: 100m
+            memory: 64Mi
+          requests:
+            cpu: 100m
+            memory: 64Mi
+
+  - name: external
+    namespace: kube-system
+    chart: nginx/nginx-ingress
+    version: ">=0.8 <1.0"
+    values:
+      - healthStatus: true
+      - controller:
+          ingressClass: external
+          setAsDefaultIngress: true
+      - prometheus:
+          create: true
+      - image:
+          pullPolicy: Always
+      - resources:
+          limits:
+            cpu: 100m
+            memory: 64Mi
+          requests:
+            cpu: 100m
+            memory: 64Mi
+
+  - name: kube-prometheus
+    namespace: metrics
+    chart: bitnami/kube-prometheus
+    version: ">=4.0 < 5.0"
+    values:
+      - operator:
+          logLevel: warn
+          image:
+            pullPolicy: Always
+      - prometheus:
+          logLevel: warn
+          image:
+            pullPolicy: Always
+          ingress:
+            enabled: true
+      - alertmanager:
+          logLevel: warn
+          image:
+            pullPolicy: Always
+          ingress:
+            enabled: true
+
+  - name: datadog-operator
+    namespace: datadog
+    chart: datadog/datadog-operator
+    version: ">=0.4 <1.0"
+    values:
+      - image:
+          pullPolicy: Always
+      - resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
