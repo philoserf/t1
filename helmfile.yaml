@@ -1,0 +1,101 @@
+---
+repositories:
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami
+  - name: autoscaler
+    url: https://kubernetes.github.io/autoscaler
+  - name: aws-eks
+    url: https://aws.github.io/eks-charts
+  - name: nginx
+    url: https://helm.nginx.com/stable
+  - name: datadog
+    url: https://helm.datadoghq.com
+
+commonLabels:
+  subsplash.io/env: demo
+  subsplash.io/installer: helmfile
+
+releases:
+  - name: load-balancer-controller
+    namespace: kube-system
+    chart: aws-eks/aws-load-balancer-controller
+    version: ">=1.0 <2.0"
+    values:
+      - clusterName: demo
+
+  - name: node-termination-handler
+    namespace: kube-system
+    chart: aws-eks/aws-node-termination-handler
+    version: ">=0.13 <1.0"
+    values:
+      - fullnameOverride: node-termination-handler
+
+  - name: cluster-autoscaler
+    namespace: kube-system
+    chart: autoscaler/cluster-autoscaler
+    version: ">=9.1 <10.0"
+    values:
+      - fullnameOverride: cluster-autoscaler
+      - extraArgs.v: 2
+      - extraArgs.skip-nodes-with-system-pods: false
+      - extraArgs.skip-nodes-with-local-storage: false
+    set:
+      - name: autoDiscovery.clusterName
+        value: demo
+
+  - name: external-dns
+    namespace: kube-system
+    chart: bitnami/external-dns
+    version: ">=4.3 <5.0"
+
+  - name: metrics-server
+    namespace: kube-system
+    chart: bitnami/metrics-server
+    version: ">=5.3 <6.0"
+    values:
+      - apiService:
+          create: true
+
+  - name: internal
+    namespace: kube-system
+    chart: nginx/nginx-ingress
+    version: ">=0.8 <1.0"
+    values:
+      - healthStatus: true
+      - controller:
+          ingressClass: internal
+      - prometheus:
+          create: true
+
+  - name: external
+    namespace: kube-system
+    chart: nginx/nginx-ingress
+    version: ">=0.8 <1.0"
+    values:
+      - healthStatus: true
+      - controller:
+          ingressClass: external
+          setAsDefaultIngress: true
+      - prometheus:
+          create: true
+
+  - name: kube-prometheus
+    namespace: metrics
+    chart: bitnami/kube-prometheus
+    version: ">=3.6 < 4.0"
+    values:
+      - prometheus:
+          ingress:
+            enabled: true
+          persistence:
+            enabled: true
+      - alertmanager:
+          ingress:
+            enabled: true
+          persistence:
+            enabled: true
+
+  - name: datadog-operator
+    namespace: datadog
+    chart: datadog/datadog-operator
+    version: ">=0.4 <1.0"
